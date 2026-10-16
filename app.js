@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
-import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261016190021";
-import { decodeGrayPng } from "./lib/png.js?v=20261016190021";
-import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261016190021";
+import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261016190749";
+import { decodeGrayPng } from "./lib/png.js?v=20261016190749";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261016190749";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -311,15 +311,22 @@ const assemblies = {};
 async function showChair() {
   $("#panel").innerHTML = ROLE === "cnc" ? cncPanel() : ebPanel();
   $("#viewer-msg").textContent = "Chargement de la chaise…";
-  await drawAssembly();
+  try {
+    await drawAssembly();
+  } catch (err) {
+    files.delete(IDX.assemblages[current.vid]);   // on retentera au prochain clic
+    delete assemblies[current.vid];
+    if (current.pid === "") $("#viewer-msg").innerHTML = `La chaise n'a pas pu être chargée (${esc(err.message)}).<br>Cliquez de nouveau sur « Toutes les planches » ou « Montage ».`;
+    return;
+  }
   if (current.pid !== "") return;
   $("#viewer-msg").textContent = "";
 }
 
 async function drawAssembly() {
-  const vid = current.vid;
+  const vid = current.vid, role = ROLE;
   if (!assemblies[vid]) assemblies[vid] = parseAssembly(await getFile(IDX.assemblages[vid]));
-  if (current.vid !== vid) return;
+  if (current.vid !== vid || ROLE !== role || (current.pid !== "" && current.pid !== "debit")) return;   // un clic plus recent a pris la main
   const assembly = assemblies[vid];
   const g = new THREE.Group();
   for (const p of assembly) {
