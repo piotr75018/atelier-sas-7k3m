@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sas d'usinage</title>
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "client-zip": "https://cdn.jsdelivr.net/npm/client-zip@2.4.5/index.js"
+} }
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1 id="titre">Sas d'usinage</h1>
+    <p id="sous-titre" class="muted">Chargement…</p>
+  </div>
+  <div id="roles" class="seg" role="group" aria-label="Destinataire">
+    <button data-r="cnc">CNC · bas-reliefs</button>
+    <button data-r="eb">Ébénisterie</button>
+  </div>
+  <div class="dl-all" id="dl-all">
+    <label for="zip-var" class="muted">Tous les STL CNC</label>
+    <select id="zip-var">
+      <option value="F1">Finition 1</option>
+      <option value="F2">Finition 2</option>
+      <option value="F1,F2">Les deux</option>
+    </select>
+    <button id="zip-btn" class="btn primary" disabled>Télécharger (.zip)</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav id="nav" class="nav" aria-label="Pièces"></nav>
+  <main class="main">
+    <section class="viewer-wrap">
+      <canvas id="viewer"></canvas>
+      <div id="viewer-msg" class="viewer-msg"></div>
+      <div class="viewer-hint muted">Glisser pour tourner · molette pour zoomer · clic droit pour déplacer</div>
+    </section>
+    <section id="panel" class="panel"></section>
+  </main>
+</div>
+
+<div id="status" class="status" hidden></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
