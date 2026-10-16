@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
-import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261016190749";
-import { decodeGrayPng } from "./lib/png.js?v=20261016190749";
-import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261016190749";
+import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261016191307";
+import { decodeGrayPng } from "./lib/png.js?v=20261016191307";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261016191307";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -178,7 +178,7 @@ function pick(N, step) {
 }
 
 // relief allege pour l'affichage (le STL telecharge, lui, est a pleine definition)
-function reliefObject(z, v, map) {
+function reliefObject(z, v, map, extra) {
   const { NX, NY, data } = z;
   const step = Math.max(1, Math.ceil(Math.max(NX, NY) / 900));
   const ri = pick(NY, step), ci = pick(NX, step);
@@ -208,6 +208,8 @@ function reliefObject(z, v, map) {
   for (let i = 0; i < nr - 1; i++) {
     for (let j = 0; j < nc - 1; j++) {
       const a = i * nc + j, b = a + 1, d = a + nc, c = d + 1;
+      if (v.lat && (data[ri[i] * NX + ci[j]] === 0 || data[ri[i] * NX + ci[j + 1]] === 0 ||
+                    data[ri[i + 1] * NX + ci[j]] === 0 || data[ri[i + 1] * NX + ci[j + 1]] === 0)) continue;   // hors matiere (coins arrondis)
       idx.set([a, c, b, a, d, c], q);
       q += 6;
     }
@@ -215,8 +217,18 @@ function reliefObject(z, v, map) {
   const top = new THREE.BufferGeometry();
   top.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   top.setAttribute("color", new THREE.BufferAttribute(col, 3));
-  top.setIndex(new THREE.BufferAttribute(idx, 1));
+  top.setIndex(new THREE.BufferAttribute(idx.subarray(0, q), 1));
   top.computeVertexNormals();
+
+  // conge lateral : le pourtour (sol + bandes arrondies) est celui du STL, tel quel
+  if (v.lat && extra) {
+    const rim = new THREE.BufferGeometry();
+    rim.setAttribute("position", new THREE.BufferAttribute(extra, 3));
+    rim.computeVertexNormals();
+    const gl = new THREE.Group();
+    gl.add(new THREE.Mesh(top, matVertex), new THREE.Mesh(rim, matPlain));
+    return gl;
+  }
 
   // parois + dessous
   const ring = [];
@@ -410,8 +422,9 @@ async function drawPlanche() {
   $("#viewer-msg").textContent = "Chargement du relief…";
   const z = await getZ(v.lat ? v.lat.png : v.png);
   const map = tool ? await getFile(v.cartes[tool]).then(decodeGrayPng) : null;
+  const extra = v.lat ? new Float32Array((await getFile(v.lat.extra)).slice(0)) : null;
   if (current.pid !== pid || current.vid !== vid || current.tool !== tool) return;
-  const obj = reliefObject(z, v, map);
+  const obj = reliefObject(z, v, map, extra);
   const keep = content.userData.pid === pid && content.userData.vid === vid;
   if (keep) {
     const cam = camera.position.clone(), tgt = controls.target.clone();
