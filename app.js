@@ -591,4 +591,4 @@ async function main() {
   setRole(h.get("r") === "eb" ? "eb" : "cnc");
   go(h.get("p") || "", h.get("v") || undefined);
 }
-main();
+main().catch((err) => status("Erreur : " + err.message));
