@@ -26,6 +26,11 @@
   window.addEventListener("unhandledrejection", function (e) { sasPanne(String(e.reason && e.reason.message || e.reason)); });
   if (!(HTMLScriptElement.supports && HTMLScriptElement.supports("importmap")))
     window.addEventListener("DOMContentLoaded", function () { sasPanne("navigateur trop ancien"); });
+  if (location.protocol === "file:")
+    window.addEventListener("DOMContentLoaded", function () {
+      sasPanne("ce fichier est ouvert directement depuis le disque (file://), ce que les navigateurs bloquent. " +
+        "Ouvrez le lien en ligne (lien.txt) ou lancez <code>python sas.py --serve</code>");
+    });
   setTimeout(function () { sasPanne("délai dépassé (réseau lent ou bloqué)"); }, 30000);
 </script>
 </head>
