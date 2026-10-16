@@ -49,11 +49,11 @@ p { margin: .3rem 0; }
 .small { font-size: .85rem; }
 
 .top {
-  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center;
   padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--line);
 }
 .brand p { margin: 2px 0 0; font-size: .9rem; }
-.dl-all { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dl-all { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-self: end; }
 
 .btn {
   font: inherit; border: 1px solid var(--line); background: var(--surface-2); color: var(--text);
@@ -124,7 +124,21 @@ pre.fiche { white-space: pre-wrap; font-size: .8rem; background: var(--surface-2
   .nav { border-right: 0; border-bottom: 1px solid var(--line); display: flex; overflow-x: auto; gap: 4px; padding: 8px 16px; }
   .nav h4 { display: none; }
   .nav button { width: auto; white-space: nowrap; }
+  .top { grid-template-columns: 1fr; justify-items: start; }
+  .dl-all { justify-self: start; }
   .top, .panel { padding-left: 16px; padding-right: 16px; }
 }
+
+.seg.big button { padding: 9px 18px; font-weight: 600; }
+.steps { padding-left: 1.3em; margin: .4rem 0 .8rem; }
+.steps li { margin: .45rem 0; }
+.pieces { display: grid; gap: 8px; margin: 10px 0; }
+.piece { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.piece:hover { border-color: var(--accent); background: var(--surface-2); }
+.pick { cursor: pointer; }
+details.more { margin: 14px 0; border-top: 1px solid var(--line); padding-top: 8px; }
+details.more summary { cursor: pointer; color: var(--muted); font-size: .9rem; }
+details.more[open] summary { margin-bottom: 6px; }
+.panel a { color: var(--accent); }
 
 [hidden] { display: none !important; }

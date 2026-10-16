@@ -40,18 +40,13 @@
     <h1 id="titre">Sas d'usinage</h1>
     <p id="sous-titre" class="muted">Chargement…</p>
   </div>
-  <div id="roles" class="seg" role="group" aria-label="Destinataire">
-    <button data-r="cnc">CNC · bas-reliefs</button>
+  <div id="roles" class="seg big" role="group" aria-label="Je suis">
+    <button data-r="cnc">Usinage CNC</button>
     <button data-r="eb">Ébénisterie</button>
   </div>
   <div class="dl-all" id="dl-all">
-    <label for="zip-var" class="muted">Tous les STL CNC</label>
-    <select id="zip-var">
-      <option value="F1">Finition 1</option>
-      <option value="F2">Finition 2</option>
-      <option value="F1,F2">Les deux</option>
-    </select>
-    <button id="zip-btn" class="btn primary" disabled>Télécharger (.zip)</button>
+    <div id="fin" class="seg" role="group" aria-label="Finition"></div>
+    <button id="zip-btn" class="btn primary" disabled>Télécharger les STL</button>
   </div>
 </header>
 
@@ -61,13 +56,13 @@
     <section class="viewer-wrap">
       <canvas id="viewer"></canvas>
       <div id="viewer-msg" class="viewer-msg"></div>
-      <div class="viewer-hint muted">Glisser pour tourner · molette pour zoomer · clic droit pour déplacer</div>
+      <div class="viewer-hint muted">Tourner : glisser · Zoom : molette · Déplacer : clic droit · Cliquez une pièce pour l'ouvrir</div>
     </section>
     <section id="panel" class="panel"></section>
   </main>
 </div>
 
 <div id="status" class="status" hidden></div>
-<script type="module" src="app.js?v=20261016172556"></script>
+<script type="module" src="app.js?v=20261016184921"></script>
 </body>
 </html>

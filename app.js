@@ -3,7 +3,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
 import { importKey, decrypt, opaqueName } from "./lib/crypt.js";
 import { decodeGrayPng } from "./lib/png.js";
-import { zFromU16, buildStl } from "./lib/stl.js";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -189,7 +189,8 @@ function reliefObject(z, v, map) {
   let p = 0;
   for (const r of ri) {
     for (const c of ci) {
-      const zz = v.base + v.relief * data[r * NX + c] / 65535;
+      const u = data[r * NX + c];
+      const zz = v.lat ? v.lat.zlo + (v.lat.zhi - v.lat.zlo) * Math.max(u - 1, 0) / 65534 : v.base + v.relief * u / 65535;
       pos[p] = c / (NX - 1) * v.W; pos[p + 1] = v.H * (1 - r / (NY - 1)); pos[p + 2] = zz;
       tmp.copy(c0);
       if (map) {
@@ -254,7 +255,7 @@ const isPlanche = (pid) => !!IDX.planches[pid];
 function setRole(r) {
   ROLE = r;
   for (const b of document.querySelectorAll("#roles button")) b.classList.toggle("on", b.dataset.r === r);
-  $("#dl-all").hidden = r !== "cnc";
+  $("#dl-all").style.visibility = r === "cnc" ? "" : "hidden";
   buildNav();
 }
 function buildNav() {
@@ -269,15 +270,19 @@ function buildNav() {
   };
   const h = (t) => { const e = document.createElement("h4"); e.textContent = t; nav.appendChild(e); };
   if (ROLE === "cnc") {
-    add("", "Vue d'ensemble CNC");
+    add("", "Toutes les planches");
     h("Bas-reliefs à usiner");
     for (const pid of IDX.ordre) add(pid, IDX.planches[pid].nom);
   } else {
-    add("", "Chaise montée");
+    add("", "Montage");
     add("debit", "Liste de débit");
     h("Pièces lisses");
     for (const p of IDX.lisses) add(p.id, p.nom, p.a_confirmer ? "à confirmer" : "");
   }
+}
+function markFin() {
+  for (const b of document.querySelectorAll("#fin button")) b.classList.toggle("on", b.dataset.v === current.vid);
+  $("#zip-btn").textContent = `Télécharger les STL · ${IDX.variantes[current.vid].nom}`;
 }
 function markNav(pid) {
   for (const b of document.querySelectorAll("#nav button")) b.classList.toggle("active", b.dataset.pid === pid);
@@ -288,6 +293,7 @@ async function go(pid, vid) {
   current = { pid, vid: vid || current.vid || "F1", tool: null };
   if (pid) { const r = isPlanche(pid) ? "cnc" : "eb"; if (r !== ROLE || !$("#nav").children.length) setRole(r); }
   setHash(pid, current.vid);
+  markFin();
   markNav(pid);
   hovered = null;
   canvas.style.cursor = "";
@@ -299,7 +305,7 @@ async function go(pid, vid) {
 }
 
 // ------------------------------------------------------------------ vues
-let assembly = null;
+const assemblies = {};
 // chaise montee : en CNC seules les planches sculptees sont cliquables (le reste en fantome),
 // en ebenisterie seules les pieces lisses le sont
 async function showChair() {
@@ -311,7 +317,10 @@ async function showChair() {
 }
 
 async function drawAssembly() {
-  if (!assembly) assembly = parseAssembly(await getFile(IDX.assemblage));
+  const vid = current.vid;
+  if (!assemblies[vid]) assemblies[vid] = parseAssembly(await getFile(IDX.assemblages[vid]));
+  if (current.vid !== vid) return;
+  const assembly = assemblies[vid];
   const g = new THREE.Group();
   for (const p of assembly) {
     const carved = isPlanche(p.id);
@@ -327,47 +336,57 @@ async function drawAssembly() {
 }
 
 function cncPanel() {
-  const prov = Object.values(IDX.variantes).some((v) => v.provisoire);
-  const rows = IDX.ordre.map((pid) => {
-    const v = IDX.planches[pid].variantes.F1;
-    return `<tr class="pick" data-go="${pid}"><td>${esc(IDX.planches[pid].nom)}</td><td class="num">${nf(v.W)} × ${nf(v.H)}</td><td class="num">${nf(v.diag.reco.brut.ep_min)}</td></tr>`;
+  const vid = current.vid;
+  const cards = IDX.ordre.map((pid, i) => {
+    const v = IDX.planches[pid].variantes[vid], r = v.diag.reco;
+    return `<div class="piece pick" data-go="${pid}">
+      <div><b>${i + 1}. ${esc(IDX.planches[pid].nom)}</b><br><span class="muted small">${nf(v.W, 0)} × ${nf(v.H, 0)} mm · brut ${nf(r.brut.ep_min)} mm · ${esc(r.finition.nom)}</span></div>
+      <button class="btn" data-stl="${pid}">STL</button></div>`;
   }).join("");
-  setTimeout(() => document.querySelectorAll("[data-go]").forEach((tr) => (tr.onclick = () => go(tr.dataset.go))));
+  setTimeout(() => {
+    document.querySelectorAll("[data-go]").forEach((el) => (el.onclick = () => go(el.dataset.go)));
+    document.querySelectorAll("[data-stl]").forEach((b) => (b.onclick = (ev) => { ev.stopPropagation(); downloadStl(b.dataset.stl, current.vid); }));
+    $("#zip-big").onclick = downloadAll;
+  });
   return `
-    <h2>Usinage CNC · bas-reliefs</h2>
-    <p class="muted small">Seuls les ${IDX.ordre.length} motifs en bas-relief sont à usiner. Cliquez une planche (sur la chaise ou dans la liste) pour la voir seule, la télécharger et lire son diagnostic.</p>
-    ${prov ? '<div class="note">Les réglages des deux finitions sont encore <b>provisoires</b> : les fichiers seront remplacés à la même adresse.</div>' : ""}
-    <ul class="small">
-      <li>STL binaires en <b>millimètres</b>, une planche par fichier, chacune en ${Object.keys(IDX.variantes).length} finitions (${Object.entries(IDX.variantes).map(([k, v]) => `${k} = ${esc(v.nom)}`).join(", ")}).</li>
-      <li>Repère : X = largeur, Y = hauteur de l'image (<b>sens du fil</b>), Z = épaisseur ; dessous de la planche à Z = 0, coin bas-gauche à l'origine.</li>
-      <li>Le relief <b>ajoute</b> de la matière : le fond du motif est à l'épaisseur de la planche (24 mm), le motif au-dessus.</li>
-      <li>Chaque planche a un diagnostic calculé sur sa surface réelle : brut, ébauche, fraise de finition, pas, zones que chaque fraise n'atteint pas.</li>
-      <li>La heightmap 16 bits (noir = fond, blanc = relief maximal) est aussi téléchargeable pour Aspire / VCarve.</li>
-      <li>Le bouton « Télécharger (.zip) » en haut réunit tous les STL des bas-reliefs. Les pièces lisses n'en font pas partie : elles concernent l'ébéniste.</li>
-    </ul>
-    <h3>Bas-reliefs à usiner</h3>
-    <table><tr><th>Planche</th><th class="num">Cotes (mm)</th><th class="num">Brut ≥ (mm)</th></tr>${rows}</table>
-    <p class="muted small">Généré le ${esc(IDX.genere)}.</p>`;
+    <h2>Usinage des bas-reliefs</h2>
+    <ol class="steps">
+      <li>Choisissez la finition en haut : ${finSummary()}.</li>
+      <li>Téléchargez les fichiers : <button class="btn primary" id="zip-big">Les ${IDX.ordre.length} STL en .zip</button></li>
+      <li>Cliquez une planche pour la voir seule et lire ses conseils d'usinage.</li>
+    </ol>
+    <div class="pieces">${cards}</div>
+    <details class="more"><summary>Repère et unités</summary><ul class="small">
+      <li>STL en <b>millimètres</b>, une planche par fichier.</li>
+      <li>X = largeur, Y = hauteur de l'image (<b>sens du fil</b>), Z = épaisseur ; dessous de la planche à Z = 0.</li>
+      <li>Le relief <b>ajoute</b> de la matière : le fond du motif est à 24 mm du dessous, le motif au-dessus.</li>
+    </ul></details>
+    <p class="muted small">Mis à jour le ${esc(IDX.genere)}.</p>`;
+}
+
+function finSummary() {
+  return Object.entries(IDX.variantes).map(([k, v]) => `<b>${esc(v.nom)}</b>${v.resume ? " = " + esc(v.resume) : ""}`).join(" ; ");
 }
 
 function ebPanel() {
-  const lis = IDX.lisses.map((p) => `<tr class="pick" data-go="${p.id}"><td>${esc(p.nom)}${p.a_confirmer ? ' <span class="badge warn">à confirmer</span>' : ""}</td><td class="num">${p.dims.map((x) => nf(x)).join(" × ")}</td></tr>`).join("");
+  const lis = IDX.lisses.map((p) => `<div class="piece pick" data-go="${p.id}"><div><b>${esc(p.nom)}</b>${p.a_confirmer ? ' <span class="badge warn">à confirmer</span>' : ""}<br><span class="muted small">${p.dims.map((x) => nf(x, 0)).join(" × ")} mm</span></div></div>`).join("");
   setTimeout(() => {
-    document.querySelectorAll("[data-go]").forEach((tr) => (tr.onclick = () => go(tr.dataset.go)));
+    document.querySelectorAll("[data-go]").forEach((el) => (el.onclick = () => go(el.dataset.go)));
     $("#lisses-zip").onclick = downloadLisses;
   });
   return `
     <h2>Ébénisterie</h2>
-    <p class="muted small">Les bas-reliefs sont usinés par le prestataire CNC. Ici : le débit des pièces, le montage, et les pièces lisses. Cliquez une pièce lisse sur la chaise ou dans la liste.</p>
+    <p class="muted small">Les bas-reliefs arrivent usinés par le prestataire CNC. Ici : quoi débiter et comment monter.</p>
+    <div class="dl-row">
+      <button class="btn primary" id="debit-btn" onclick="location.hash='k=${KEYB64}&r=eb&p=debit'">Liste de débit</button>
+      <button class="btn" id="lisses-zip">STL des pièces lisses</button>
+      <button class="btn" id="fiche-btn">Fiche texte</button>
+    </div>
     <h3>Montage</h3>
     <ul class="small">${IDX.ebeniste.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
-    <p><button class="btn primary" id="debit-btn" onclick="location.hash='k=${KEYB64}&r=eb&p=debit'">Liste de débit complète</button>
-       <button class="btn" id="fiche-btn">Fiche texte (.txt)</button></p>
     <h3>Pièces lisses</h3>
-    <table><tr><th>Pièce</th><th class="num">L × l × ép. (mm)</th></tr>${lis}</table>
-    <p><button class="btn" id="lisses-zip">STL des pièces lisses (.zip)</button></p>
-    ${IDX.ecarts.length ? `<h3>Cotes retenues</h3><ul class="small muted">${IDX.ecarts.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
-    <p class="muted small">Généré le ${esc(IDX.genere)}.</p>`;
+    <div class="pieces">${lis}</div>
+    <p class="muted small">Mis à jour le ${esc(IDX.genere)}.</p>`;
 }
 
 async function showPlanche() {
@@ -382,7 +401,7 @@ async function drawPlanche() {
   const { pid, vid, tool } = current;
   const v = IDX.planches[pid].variantes[vid];
   $("#viewer-msg").textContent = "Chargement du relief…";
-  const z = await getZ(v.png);
+  const z = await getZ(v.lat ? v.lat.png : v.png);
   const map = tool ? await getFile(v.cartes[tool]).then(decodeGrayPng) : null;
   if (current.pid !== pid || current.vid !== vid || current.tool !== tool) return;
   const obj = reliefObject(z, v, map);
@@ -399,49 +418,45 @@ async function drawPlanche() {
 function renderPlanchePanel() {
   const { pid, vid, tool } = current;
   const e = IDX.planches[pid], v = e.variantes[vid], d = v.diag, r = d.reco;
-  const vars = Object.keys(e.variantes).map((k) => `<button class="${k === vid ? "on" : ""}" data-v="${k}">${esc(IDX.variantes[k].nom)}</button>`).join("");
-  const prov = IDX.variantes[vid].provisoire;
   const toolRows = d.fraises.map((t) => {
     const cls = t.non_atteint_pct <= 1 ? "ok" : "bad";
     const isFin = t.id === r.finition.outil, isRep = r.reprise && t.id === r.reprise.outil;
     return `<tr class="pick ${t.id === tool ? "sel" : ""}" data-tool="${t.id}"><td>${esc(t.nom)}${isFin ? ' <span class="badge">finition</span>' : ""}${isRep ? ' <span class="badge">reprise</span>' : ""}</td>
-      <td class="num ${cls}">${nf(t.non_atteint_pct, 2)} %</td><td class="num">${nf(t.reste_max_mm, 2)}</td></tr>`;
+      <td class="num ${cls}">${nf(t.non_atteint_pct, 2)} %</td></tr>`;
   }).join("");
   $("#panel").innerHTML = `
-    <h2>${esc(e.nom)}</h2>
+    <p class="small"><a href="#" id="back">← Toutes les planches</a></p>
+    <h2>${esc(e.nom)} <span class="badge">${esc(IDX.variantes[vid].nom)}</span></h2>
     <p class="muted small">${esc(e.sens)}</p>
-    <div class="seg" role="group" aria-label="Finition">${vars}</div>
-    ${prov ? '<span class="badge warn" style="margin-left:6px">réglages provisoires</span>' : ""}
-    <dl class="kv">
-      <dt>Cotes finies</dt><dd>${nf(v.W)} × ${nf(v.H)} mm</dd>
-      <dt>Fond du relief</dt><dd>${nf(v.base)} mm du dessous</dd>
-      <dt>Relief maximal</dt><dd>${nf(d.relief_max_mm, 2)} mm (sommet à ${nf(v.base + d.relief_max_mm, 2)} mm)</dd>
-      <dt>Grille du STL</dt><dd>${nf(d.pas_grille_mm, 3)} mm · ${v.nx} × ${v.ny} points</dd>
-      <dt>Triangles</dt><dd>${v.ntri.toLocaleString("fr-FR")} (${nf(v.stl_mo, 0)} Mo)</dd>
-    </dl>
     <div class="dl-row">
       <button class="btn primary" id="dl-stl">Télécharger le STL</button>
-      <button class="btn" id="dl-png">Heightmap 16 bits (.png)</button>
     </div>
-    <h3>Diagnostic d'usinage</h3>
-    <div class="card small"><b>Brut</b><p>${esc(r.brut.texte)}</p></div>
-    <div class="card small"><b>Ébauche</b><p>${esc(r.ebauche)}</p></div>
-    <div class="card small"><b>Finition</b><p>${esc(r.finition.texte)}</p></div>
-    ${r.reprise ? `<div class="card small"><b>Reprise</b><p>${esc(r.reprise.texte)}</p></div>` : ""}
-    ${r.ecartees.length ? `<p class="small muted"><b>Options plus simples écartées</b></p><ul class="small muted">${r.ecartees.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-    <h3>Ce que chaque fraise atteint</h3>
-    <p class="small muted">Simulation d'une fraise qui balaie toute la surface. « Non atteint » = part du motif où il reste plus de ${nf(IDX.seuil_reste_mm, 2)} mm de matière. Cliquez une ligne pour voir ces zones sur la pièce.</p>
-    <table>
-      <tr><th>Fraise</th><th class="num">Non atteint</th><th class="num">Reste max (mm)</th></tr>
-      <tr class="pick ${tool ? "" : "sel"}" data-tool=""><td>Aucune carte</td><td></td><td></td></tr>
-      ${toolRows}
-    </table>
-    <div class="legend" style="margin-top:8px"><span>${nf(IDX.seuil_reste_mm, 2)} mm</span><span class="bar"></span><span>≥ 0,55 mm restant</span></div>
-    <p class="small muted">Pente du motif (99e centile) : ${nf(d.pente_p99_deg, 0)}° · motif : ${nf(d.motif_pct, 0)} % de la surface · avance supposée ${nf(IDX.avance_mm_min, 0)} mm/min pour les temps.</p>`;
-  for (const b of document.querySelectorAll(".seg button")) b.onclick = () => { current.vid = b.dataset.v; current.tool = null; setHash(pid, current.vid); renderPlanchePanel(); drawPlanche(); };
+    <dl class="kv">
+      <dt>Dimensions</dt><dd>${nf(v.W)} × ${nf(v.H)} mm</dd>
+      <dt>Brut</dt><dd>${nf(r.brut.ep_min)} mm d'épaisseur minimum</dd>
+      <dt>Relief</dt><dd>${nf(d.relief_max_mm, 1)} mm au-dessus du fond (fond à ${nf(v.base, 0)} mm)</dd>
+      ${v.lat ? `<dt>Bords</dt><dd>arrondis R${nf(v.lat.r_mm, 0)} (inclus dans le STL)</dd>` : ""}
+    </dl>
+    <h3>Conseils d'usinage</h3>
+    <ol class="steps small">
+      <li><b>Ébauche</b> : ${esc(r.ebauche)}</li>
+      <li><b>Finition</b> : ${esc(r.finition.texte)}</li>
+      ${r.reprise ? `<li><b>Reprise</b> : ${esc(r.reprise.texte)}</li>` : ""}
+    </ol>
+    <details class="more" ${tool ? "open" : ""}><summary>Détail : zones atteintes par chaque fraise</summary>
+      <p class="small muted">Cliquez une fraise pour colorer sur la pièce les zones où il reste plus de ${nf(IDX.seuil_reste_mm, 2)} mm de matière.</p>
+      <table>
+        <tr><th>Fraise</th><th class="num">Non atteint</th></tr>
+        <tr class="pick ${tool ? "" : "sel"}" data-tool=""><td>Aucune couleur</td><td></td></tr>
+        ${toolRows}
+      </table>
+      <div class="legend" style="margin-top:8px"><span>${nf(IDX.seuil_reste_mm, 2)} mm</span><span class="bar"></span><span>≥ 0,55 mm restant</span></div>
+      ${r.ecartees.length ? `<p class="small muted"><b>Options plus simples écartées</b></p><ul class="small muted">${r.ecartees.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <p class="small muted">STL : grille ${nf(d.pas_grille_mm, 2)} mm, ${v.ntri.toLocaleString("fr-FR")} triangles (${nf(v.stl_mo, 0)} Mo). Temps estimés pour ${nf(IDX.avance_mm_min, 0)} mm/min.</p>
+    </details>`;
+  $("#back").onclick = (ev) => { ev.preventDefault(); go(""); };
   for (const tr of document.querySelectorAll("tr[data-tool]")) tr.onclick = () => { current.tool = tr.dataset.tool || null; renderPlanchePanel(); drawPlanche(); };
   $("#dl-stl").onclick = () => downloadStl(pid, current.vid);
-  $("#dl-png").onclick = async () => save(new Blob([await getFile(v.png)], { type: "image/png" }), `chaise_${pid}_${vid}_heightmap16.png`);
 }
 
 async function showLisse(pid) {
@@ -489,9 +504,13 @@ function save(blob, name) {
 async function makeStl(pid, vid, label) {
   const v = IDX.planches[pid].variantes[vid];
   status(`${label || IDX.planches[pid].nom} : préparation du relief…`);
-  const z = await getZ(v.png);
+  const z = await getZ(v.lat ? v.lat.png : v.png);
   status(`${label || IDX.planches[pid].nom} : génération du STL (${v.ntri.toLocaleString("fr-FR")} triangles)…`);
   await tick();
+  if (v.lat) {
+    const extra = new Float32Array((await getFile(v.lat.extra)).slice(0));
+    return buildStlLat(z.data, z.NX, z.NY, v.W, v.H, v.lat.zlo, v.lat.zhi, extra);
+  }
   return buildStl(zFromU16(z.data), z.NX, z.NY, v.W, v.H, v.base, v.relief);
 }
 
@@ -511,7 +530,6 @@ async function* zipEntries(vids) {
       const label = `${vid} · ${i + 1}/${IDX.ordre.length} · ${IDX.planches[pid].nom}`;
       const v = IDX.planches[pid].variantes[vid];
       yield { name: `${vid}_${IDX.variantes[vid].nom.replace(/\s+/g, "_")}/${pid}_${vid}.stl`, input: new Uint8Array(await makeStl(pid, vid, label)), lastModified: now };
-      yield { name: `${vid}_${IDX.variantes[vid].nom.replace(/\s+/g, "_")}/heightmaps/${pid}_${vid}_heightmap16.png`, input: await getFile(v.png), lastModified: now };
     }
   }
 }
@@ -526,7 +544,7 @@ async function downloadLisses() {
 }
 
 async function downloadAll() {
-  const vids = $("#zip-var").value.split(",");
+  const vids = [current.vid];
   const name = `chaise_usinage_${vids.join("_")}.zip`;
   const btn = $("#zip-btn");
   btn.disabled = true;
@@ -571,9 +589,9 @@ async function main() {
   $("#titre").textContent = IDX.titre + " · sas d'usinage";
   $("#sous-titre").textContent = `${IDX.ordre.length} bas-reliefs × ${Object.keys(IDX.variantes).length} finitions · généré le ${IDX.genere}`;
   for (const b of document.querySelectorAll("#roles button")) b.onclick = () => { setRole(b.dataset.r); go(""); };
-  const sel = $("#zip-var");
-  sel.innerHTML = Object.entries(IDX.variantes).map(([k2, v]) => `<option value="${k2}">${esc(v.nom)}</option>`).join("") +
-    `<option value="${Object.keys(IDX.variantes).join(",")}">Toutes les finitions</option>`;
+  // une seule finition a la fois : les boutons du haut pilotent la vue et les telechargements
+  $("#fin").innerHTML = Object.entries(IDX.variantes).map(([k2, v]) => `<button data-v="${k2}" title="${esc(v.resume || "")}">${esc(v.nom)}</button>`).join("");
+  for (const b of document.querySelectorAll("#fin button")) b.onclick = () => go(current.pid, b.dataset.v);
   $("#zip-btn").disabled = false;
   $("#zip-btn").onclick = downloadAll;
   document.addEventListener("click", async (ev) => {
