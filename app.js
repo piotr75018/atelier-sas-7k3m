@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
-import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261016191307";
-import { decodeGrayPng } from "./lib/png.js?v=20261016191307";
-import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261016191307";
+import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261018160022";
+import { decodeGrayPng } from "./lib/png.js?v=20261018160022";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261018160022";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
