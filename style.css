@@ -142,3 +142,51 @@ details.more[open] summary { margin-bottom: 6px; }
 .panel a { color: var(--accent); }
 
 [hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- devis */
+.devis-page { display: none; }
+body.devis .layout { display: none; }
+body.devis .devis-page { display: block; }
+.devis-doc { max-width: 960px; margin: 0 auto; padding: 20px 24px 48px; }
+.devis-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.dv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dv-who { display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap; }
+.dv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 8px 0; }
+.fld { display: flex; flex-direction: column; gap: 3px; font-size: .8rem; color: var(--muted); }
+.fld.wide { margin: 10px 0; }
+.fld input, .fld textarea, .in {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; min-width: 0;
+}
+.fld textarea { resize: vertical; }
+.in { width: 7.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.in:focus, .fld input:focus, .fld textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dv-table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+.dv-table th, .dv-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+.dv-table th.num, .dv-table td.num { text-align: right; }
+.dv-table tr.tot td { border-bottom: 0; padding-top: 4px; }
+.dv-table details.more { margin: 4px 0 0; padding-top: 4px; border-top: 0; }
+.dv-inc { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0; }
+.dv-inc label { display: flex; gap: 6px; align-items: center; }
+
+@media (max-width: 720px) {
+  .devis-doc { padding: 16px; }
+  .dv-table { font-size: .85rem; }
+  .in { width: 6em; }
+}
+@media print {
+  .top, .nav, .noprint, .status, .viewer-wrap, details.more > summary { display: none !important; }
+  body.devis .devis-page { display: block; }
+  .devis-doc { max-width: none; padding: 0; }
+  .in, .fld input, .fld textarea { border: 0; padding: 0; background: none; }
+  .dv-table tr, .dv-table td { break-inside: avoid; }
+  body { background: #fff; color: #000; }
+}
+.dv-docs { display: grid; gap: 8px; margin: 8px 0 4px; }
+.dv-docs > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dv-depot { margin-top: 18px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.drop { display: flex; align-items: center; justify-content: center; min-height: 84px; padding: 12px; border: 2px dashed var(--line); border-radius: var(--radius); cursor: pointer; text-align: center; color: var(--muted); }
+.drop.over, .drop:hover { border-color: var(--accent); color: var(--text); }
+.drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.drop:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dv-depot progress { width: 100%; margin-top: 6px; accent-color: var(--accent); }

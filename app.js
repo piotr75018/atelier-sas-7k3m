@@ -1,9 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
-import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261018160022";
-import { decodeGrayPng } from "./lib/png.js?v=20261018160022";
-import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261018160022";
+import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261019192336";
+import { decodeGrayPng } from "./lib/png.js?v=20261019192336";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261019192336";
+import { mountDevis } from "./lib/devis.js?v=20261019192336";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -40,7 +41,8 @@ function status(msg) {
 
 // ------------------------------------------------------------------ etat dans le lien (#k=...&p=...&v=...)
 function hashParams() { return new URLSearchParams(location.hash.slice(1)); }
-let ROLE = "cnc";                 // "cnc" = bas-reliefs a usiner, "eb" = ebenisterie
+let ROLE = "cnc";                 // "cnc" = bas-reliefs a usiner, "eb" = ebenisterie, "dv" = devis
+const roleOf = (r) => (r === "eb" || r === "dv" ? r : "cnc");
 function setHash(p, v) {
   const h = new URLSearchParams();
   h.set("k", KEYB64);
@@ -268,6 +270,7 @@ function setRole(r) {
   ROLE = r;
   for (const b of document.querySelectorAll("#roles button")) b.classList.toggle("on", b.dataset.r === r);
   $("#dl-all").style.visibility = r === "cnc" ? "" : "hidden";
+  document.body.classList.toggle("devis", r === "dv");
   buildNav();
 }
 function buildNav() {
@@ -310,13 +313,25 @@ async function go(pid, vid) {
   hovered = null;
   canvas.style.cursor = "";
   canvas.title = "";
-  if (!pid) return showChair();
+  if (!pid) return ROLE === "dv" ? showDevis() : showChair();
   if (pid === "debit") return showDebit();
   if (IDX.planches[pid]) return showPlanche();
   return showLisse(pid);
 }
 
 // ------------------------------------------------------------------ vues
+let devisMonte = false;
+function showDevis() {
+  if (devisMonte) return;
+  devisMonte = true;
+  mountDevis($("#devis-page"), IDX, { save, actions: {
+    stl: downloadAll,
+    lisses: downloadLisses,
+    cnc: () => { setRole("cnc"); go(""); },
+    debit: () => { setRole("eb"); go("debit"); },
+    fiche: async () => save(new Blob([await getFile(IDX.fiche)], { type: "text/plain" }), "chaise_fiche.txt"),
+  } });
+}
 const assemblies = {};
 // chaise montee : en CNC seules les planches sculptees sont cliquables (le reste en fantome),
 // en ebenisterie seules les pieces lisses le sont
@@ -619,14 +634,14 @@ async function main() {
   });
   window.addEventListener("hashchange", () => {
     const h = hashParams();
-    const r = h.get("r") === "eb" ? "eb" : "cnc";
+    const r = roleOf(h.get("r"));
     if (r !== ROLE) setRole(r);
     if ((h.get("p") || "") !== current.pid || (!current.pid && r !== content.userData.role)) go(h.get("p") || "", h.get("v") || undefined);
   });
   resize();
   loop();
   const h = hashParams();
-  setRole(h.get("r") === "eb" ? "eb" : "cnc");
+  setRole(roleOf(h.get("r")));
   go(h.get("p") || "", h.get("v") || undefined);
 }
 main().catch((err) => status("Erreur : " + err.message));
