@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
-import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261019192336";
-import { decodeGrayPng } from "./lib/png.js?v=20261019192336";
-import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261019192336";
-import { mountDevis } from "./lib/devis.js?v=20261019192336";
+import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261027180152";
+import { decodeGrayPng } from "./lib/png.js?v=20261027180152";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261027180152";
+import { mountDevis } from "./lib/devis.js?v=20261027180152";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));

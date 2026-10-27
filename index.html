@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Sas d'usinage</title>
+<link rel="preload" href="fonts/NHaasGroteskTXStd-75Bd.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/NHaasGroteskTXStd-55Rg.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="style.css">
 <script type="importmap">
 { "imports": {
@@ -18,7 +20,7 @@
   function sasPanne(msg) {
     var el = document.getElementById("sous-titre");
     if (el && /Chargement/.test(el.textContent)) {
-      el.innerHTML = "<b style='color:#b00'>La page n'a pas pu démarrer</b> : " + msg +
+      el.innerHTML = "<b>La page n'a pas pu démarrer</b> : " + msg +
         ". Rechargez (Ctrl+F5) ; si cela persiste, essayez un autre navigateur (Chrome, Firefox, Edge récents).";
     }
   }
@@ -66,6 +68,6 @@
 <section id="devis-page" class="devis-page" aria-label="Devis"></section>
 
 <div id="status" class="status" hidden></div>
-<script type="module" src="app.js?v=20261019192336"></script>
+<script type="module" src="app.js?v=20261027180152"></script>
 </body>
 </html>
