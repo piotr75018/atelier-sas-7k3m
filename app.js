@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { downloadZip } from "client-zip";
-import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261027180152";
-import { decodeGrayPng } from "./lib/png.js?v=20261027180152";
-import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261027180152";
-import { mountDevis } from "./lib/devis.js?v=20261027180152";
+import { importKey, decrypt, opaqueName } from "./lib/crypt.js?v=20261027181528";
+import { decodeGrayPng } from "./lib/png.js?v=20261027181528";
+import { zFromU16, buildStl, buildStlLat } from "./lib/stl.js?v=20261027181528";
+import { mountDevis } from "./lib/devis.js?v=20261027181528";
 
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -372,9 +372,9 @@ async function drawAssembly() {
 function cncPanel() {
   const vid = current.vid;
   const cards = IDX.ordre.map((pid, i) => {
-    const v = IDX.planches[pid].variantes[vid], r = v.diag.reco;
+    const v = IDX.planches[pid].variantes[vid];
     return `<div class="piece pick" data-go="${pid}">
-      <div><b>${i + 1}. ${esc(IDX.planches[pid].nom)}</b><br><span class="muted small">${nf(v.W, 0)} × ${nf(v.H, 0)} mm · brut ${nf(r.brut.ep_min)} mm · ${esc(r.finition.nom)}</span></div>
+      <div><b>${i + 1}. ${esc(IDX.planches[pid].nom)}</b><br><span class="muted small">${nf(v.W, 0)} × ${nf(v.H, 0)} mm · ép. hors tout ${nf(v.diag.hors_tout)} mm</span></div>
       <button class="btn" data-stl="${pid}">STL</button></div>`;
   }).join("");
   setTimeout(() => {
@@ -387,7 +387,7 @@ function cncPanel() {
     <ol class="steps">
       <li>Choisissez la finition en haut : ${finSummary()}.</li>
       <li>Téléchargez les fichiers : <button class="btn primary" id="zip-big">Les ${IDX.ordre.length} STL en .zip</button></li>
-      <li>Cliquez une planche pour la voir seule et lire ses conseils d'usinage.</li>
+      <li>Cliquez une planche pour la voir seule, avec ses cotes.</li>
     </ol>
     <div class="pieces">${cards}</div>
     <details class="more"><summary>Repère et unités</summary><ul class="small">
@@ -410,13 +410,13 @@ function ebPanel() {
   });
   return `
     <h2>Ébénisterie</h2>
-    <p class="muted small">Les bas-reliefs arrivent usinés par le prestataire CNC. Ici : quoi débiter et comment monter.</p>
+    <p class="muted small">Les pièces à fabriquer et leurs cotes.</p>
     <div class="dl-row">
       <button class="btn primary" id="debit-btn" onclick="location.hash='k=${KEYB64}&r=eb&p=debit'">Liste de débit</button>
       <button class="btn" id="lisses-zip">STL des pièces lisses</button>
       <button class="btn" id="fiche-btn">Fiche texte</button>
     </div>
-    <h3>Montage</h3>
+    <h3>Repères</h3>
     <ul class="small">${IDX.ebeniste.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
     <h3>Pièces lisses</h3>
     <div class="pieces">${lis}</div>
@@ -452,11 +452,10 @@ async function drawPlanche() {
 
 function renderPlanchePanel() {
   const { pid, vid, tool } = current;
-  const e = IDX.planches[pid], v = e.variantes[vid], d = v.diag, r = d.reco;
+  const e = IDX.planches[pid], v = e.variantes[vid], d = v.diag;
   const toolRows = d.fraises.map((t) => {
     const cls = t.non_atteint_pct <= 1 ? "ok" : "bad";
-    const isFin = t.id === r.finition.outil, isRep = r.reprise && t.id === r.reprise.outil;
-    return `<tr class="pick ${t.id === tool ? "sel" : ""}" data-tool="${t.id}"><td>${esc(t.nom)}${isFin ? ' <span class="badge">finition</span>' : ""}${isRep ? ' <span class="badge">reprise</span>' : ""}</td>
+    return `<tr class="pick ${t.id === tool ? "sel" : ""}" data-tool="${t.id}"><td>${esc(t.nom)}</td>
       <td class="num ${cls}">${nf(t.non_atteint_pct, 2)} %</td></tr>`;
   }).join("");
   $("#panel").innerHTML = `
@@ -468,26 +467,19 @@ function renderPlanchePanel() {
     </div>
     <dl class="kv">
       <dt>Dimensions</dt><dd>${nf(v.W)} × ${nf(v.H)} mm</dd>
-      <dt>Brut</dt><dd>${nf(r.brut.ep_min)} mm d'épaisseur minimum</dd>
+      <dt>Épaisseur hors tout</dt><dd>${nf(d.hors_tout)} mm</dd>
       <dt>Relief</dt><dd>${nf(d.relief_max_mm, 1)} mm au-dessus du fond (fond à ${nf(v.base, 0)} mm)</dd>
       ${v.lat ? `<dt>Bords</dt><dd>arrondis R${nf(v.lat.r_mm, 0)} (inclus dans le STL)</dd>` : ""}
     </dl>
-    <h3>Conseils d'usinage</h3>
-    <ol class="steps small">
-      <li><b>Ébauche</b> : ${esc(r.ebauche)}</li>
-      <li><b>Finition</b> : ${esc(r.finition.texte)}</li>
-      ${r.reprise ? `<li><b>Reprise</b> : ${esc(r.reprise.texte)}</li>` : ""}
-    </ol>
-    <details class="more" ${tool ? "open" : ""}><summary>Détail : zones atteintes par chaque fraise</summary>
-      <p class="small muted">Cliquez une fraise pour colorer sur la pièce les zones où il reste plus de ${nf(IDX.seuil_reste_mm, 2)} mm de matière.</p>
+    <details class="more" ${tool ? "open" : ""}><summary>Détails fins du motif</summary>
+      <p class="small muted">Part du motif plus fine que le rayon d'une fraise : elle y laisse plus de ${nf(IDX.seuil_reste_mm, 2)} mm de matière. Cliquez une ligne pour colorer ces zones sur la pièce.</p>
       <table>
-        <tr><th>Fraise</th><th class="num">Non atteint</th></tr>
+        <tr><th>Rayon de fraise</th><th class="num">Part non atteinte</th></tr>
         <tr class="pick ${tool ? "" : "sel"}" data-tool=""><td>Aucune couleur</td><td></td></tr>
         ${toolRows}
       </table>
       <div class="legend" style="margin-top:8px"><span>${nf(IDX.seuil_reste_mm, 2)} mm</span><span class="bar"></span><span>≥ 0,55 mm restant</span></div>
-      ${r.ecartees.length ? `<p class="small muted"><b>Options plus simples écartées</b></p><ul class="small muted">${r.ecartees.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
-      <p class="small muted">STL : grille ${nf(d.pas_grille_mm, 2)} mm, ${v.ntri.toLocaleString("fr-FR")} triangles (${nf(v.stl_mo, 0)} Mo). Temps estimés pour ${nf(IDX.avance_mm_min, 0)} mm/min.</p>
+      <p class="small muted">STL : grille ${nf(d.pas_grille_mm, 2)} mm, ${v.ntri.toLocaleString("fr-FR")} triangles (${nf(v.stl_mo, 0)} Mo).</p>
     </details>`;
   $("#back").onclick = (ev) => { ev.preventDefault(); go(""); };
   for (const tr of document.querySelectorAll("tr[data-tool]")) tr.onclick = () => { current.tool = tr.dataset.tool || null; renderPlanchePanel(); drawPlanche(); };
@@ -514,12 +506,12 @@ async function showLisse(pid) {
 
 async function showDebit() {
   const lisse = (id) => IDX.lisses.some((l) => l.id === id);
-  const rows = IDX.ebeniste.debit.map((x) => `<tr ${lisse(x.id) ? `class="pick" data-go="${x.id}"` : ""}><td>${esc(x.nom)}</td><td class="num">${nf(x.L)}</td><td class="num">${nf(x.l)}</td><td class="num">${nf(x.ep)}</td><td class="num">${nf(x.ep_brut)}</td><td class="small">${esc(x.type)}</td></tr>`).join("");
+  const rows = IDX.ebeniste.debit.map((x) => `<tr ${lisse(x.id) ? `class="pick" data-go="${x.id}"` : ""}><td>${esc(x.nom)}</td><td class="num">${nf(x.L)}</td><td class="num">${nf(x.l)}</td><td class="num">${nf(x.ep)}</td><td class="num">${nf(x.ep_hors_tout)}</td><td class="small">${esc(x.type)}</td></tr>`).join("");
   $("#panel").innerHTML = `
     <h2>Liste de débit</h2>
-    <p class="small muted">Cotes finies en mm. « Ép. brut » : épaisseur minimale du brut à raboter avant usinage (fond du relief + relief + 1 mm).</p>
-    <table><tr><th>Pièce</th><th class="num">L</th><th class="num">l</th><th class="num">Ép.</th><th class="num">Ép. brut</th><th></th></tr>${rows}</table>
-    <h3>Notes de montage</h3>
+    <p class="small muted">Cotes finies en mm. « Ép. hors tout » : épaisseur de la pièce finie, sommet du relief compris.</p>
+    <table><tr><th>Pièce</th><th class="num">L</th><th class="num">l</th><th class="num">Ép.</th><th class="num">Ép. hors tout</th><th></th></tr>${rows}</table>
+    <h3>Repères</h3>
     <ul class="small">${IDX.ebeniste.notes.map((n) => `<li>${esc(n)}</li>`).join("")}</ul>
     <h3>Fiche du piètement</h3>
     <pre class="fiche">${esc(IDX.pietement_fiche)}</pre>`;

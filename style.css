@@ -172,6 +172,8 @@ body.devis .devis-page { display: block; }
   background: transparent; border: 0; border-bottom: 1px solid var(--text); border-radius: 0; padding: 6px 0; min-width: 0;
 }
 .fld textarea { resize: vertical; border: 1px solid var(--text); padding: 8px; }
+.lab { width: 100%; font: inherit; font-size: .95rem; color: var(--text); background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 6px 0; }
+.lab:focus { outline: 0; border-bottom-color: var(--text); }
 .in { width: 7.5em; text-align: right; font-variant-numeric: tabular-nums; }
 .in:focus, .fld input:focus, .fld textarea:focus { outline: 0; border-bottom-width: 2px; }
 .fld textarea:focus { border-width: 2px; padding: 7px; }
